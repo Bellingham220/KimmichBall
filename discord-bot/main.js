@@ -1,5 +1,5 @@
 // Definitions
-require('dotenv').config()
+require('dotenv').config({ path: '/dev/null' });
 const { Client, GatewayIntentBits } = require('discord.js')
 const client = new Client({
   intents: [
