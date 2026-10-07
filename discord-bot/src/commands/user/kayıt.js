@@ -3,56 +3,42 @@ const { SlashCommandBuilder } = require('@discordjs/builders')
 
 module.exports = {
   data: {
-    name: 'kayıt',
+    name: 'registrar',
     cooldown: 5,
     slash: new SlashCommandBuilder()
-      .setName('kayıt')
-      .setDescription('Kayıt olmak için kullanılır.')
+      .setName('registrar')
+      .setDescription('Vincula tu cuenta de HaxBall con Discord utilizando tu código de autenticación.')
       .addStringOption(option =>
-        option.setName('auth')
-          .setDescription('Kayıt olmak için gereken kodu girin.')
+        option.setName('codigo')
+          .setDescription('Introduce el código de autenticación obtenido en la sala.')
           .setRequired(true))
   },
   async execute (interaction) {
+    // Nota: Las IDs de roles se pueden configurar más adelante si usas el sistema de rangos.
     const discord_roles = {
-      default: '835149597688201246',
-      isVIP: '839830479363506176',
-      isMaster: '835149585403609108',
-      isAdmin: '839206422461546557'
-    }
-    if (interaction.channel.id !== '980178670914265089') {
-      await interaction.reply({
-        content: 'Kanalın amacı kayıt olmak, eğer yanlış kullanıma devam edersen uzaklaştırılıcaksın!',
-        ephemeral: true
-      })
-      return
+      default: 'AQUÍ_ID_ROL_JUGADOR',
+      isVIP: 'AQUÍ_ID_ROL_VIP',
+      isMaster: 'AQUÍ_ID_ROL_MASTER',
+      isAdmin: 'AQUÍ_ID_ROL_ADMIN'
     }
 
-    const auth = interaction.options.getString('auth')
+    let auth = interaction.options.getString('codigo')
     try {
       let userData = null
       if (auth.length === 137) {
         const regex = /(?:idkey)\.(.*?)(?:\.)/g
         auth = regex.exec(auth)[1]
       }
+      
       const response = await fetch(`http://localhost:3100/api/getAuth/${auth}`)
       if (response.ok) {
         userData = await response.json()
       }
 
       if (userData && userData.discordID === '0') {
-        const roles = Object.entries(userData).filter(
-          ([key, value]) =>
-            key.startsWith('is') &&
-                        value === true &&
-                        !interaction.member.roles.cache.has(discord_roles[key])
-        )
-        const _roles = Object.entries(discord_roles).filter(([k, v]) =>
-          roles.map((r) => r[0]).includes(k)
-        )
-        await interaction.member.roles.add(_roles.map((r) => r[1]))
-        await interaction.member.roles.add(discord_roles.default)
-        await interaction.member.setNickname(userData.isim)
+        // Asignación automática de nombre (Nickname) basado en HaxBall
+        await interaction.member.setNickname(userData.isim).catch(() => console.log("No se pudo cambiar el apodo (falta de permisos del bot)."))
+        
         await fetch(`http://localhost:3100/api/update/${auth}`, {
           method: 'PUT',
           headers: {
@@ -60,18 +46,23 @@ module.exports = {
           },
           body: JSON.stringify({ discordID: interaction.user.id })
         })
+        
         await interaction.reply({
-          content: 'Sunucumuza başarıyla kayıt oldun! Odalarımızın devamı için VIP alarak bizlere destek olabilirsin.',
+          content: '¡Te has registrado con éxito en la liga! Tu cuenta de Discord ya está vinculada a tu usuario de HaxBall.',
           ephemeral: true
         })
-      } else if (auth.length != 43 || auth.length != 137) {
+      } else {
         await interaction.reply({
-          content: 'Kodu yanlış veya eksik girdin, tekrar kontrol et.\nAyrıca, uygulama kullanıyosan kodun farklı; yöneticilerden yardım alabilirsin.',
+          content: 'El código introducido es incorrecto, está incompleto o ya ha sido utilizado por otro usuario. Por favor, revísalo o solicita ayuda a un administrador.',
           ephemeral: true
         })
       }
     } catch (e) {
       console.error(e)
+      await interaction.reply({
+        content: 'Ocurrió un error interno al intentar procesar tu registro. Inténtalo de nuevo más tarde.',
+        ephemeral: true
+      })
     }
   }
 }
